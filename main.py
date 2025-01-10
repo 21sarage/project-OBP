@@ -121,7 +121,7 @@ def solve_scheduling_problem(df, machine_columns):
         'schedule': []
     }
 
-    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+    if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         results['objective'] = solver.ObjectiveValue()
 
         # Build output schedule info
