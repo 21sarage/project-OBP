@@ -35,8 +35,8 @@ def solve_scheduling_problem(df, machine_columns):
         row_times = [t[col] for col in machine_columns]
         times.append(row_times)
 
-    # Define horizon as sum of all processing times (a crude upper bound)
-    horizon = sum(sum(t_row) for t_row in times)
+    # Define horizon as sum of all processing times (a crude upper bound) --> NO, use max of due dates to limit usage
+    horizon = max(max(t['DueDate'] for t in tasks), sum(max(times[i]) for i in range(len(tasks))))
 
     # Create variables: start, end, interval
     start_task_per_machine_vars = {}
@@ -120,7 +120,7 @@ def solve_scheduling_problem(df, machine_columns):
         'schedule': []
     }
 
-    if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
         results['objective'] = solver.ObjectiveValue()
 
         # Build output schedule info
