@@ -132,14 +132,13 @@ def validate_schedule(schedule: List[Dict],
                      status: int) -> Dict:
     """Validate the schedule against constraints."""
     task_ids = set(input_data["TaskID"].tolist())
-    schedule_task_ids = {task["task_id"] for task in schedule}
     
     results = {}
     
     # 1. Check that all tasks are handled
     all_tasks_handled = all(task_id in [task["task_id"] for task in schedule] for task_id in task_ids)
     if not all_tasks_handled:
-        missing_tasks = set(task_ids) - set(task["task_id"] for task in schedule)
+        missing_tasks = task_ids - {task["task_id"] for task in schedule}
         results["all_tasks_handled"] = (
             False,
             f"The following tasks are missing from the schedule: {list(missing_tasks)}"
