@@ -136,39 +136,68 @@ def validate_schedule(schedule: List[Dict],
     
     results = {}
     
-    # Check all tasks are handled
-    missing_tasks = task_ids - schedule_task_ids
-    results["all_tasks_handled"] = (
-        not missing_tasks,
-        f"Missing tasks: {list(missing_tasks)}" if missing_tasks else 
-        "All tasks are handled."
-    )
-    
-    # Check release dates
-    early_starts = []
+    # 1. Check that all tasks are handled
+    all_tasks_handled = all(task_id in [task["task_id"] for task in schedule] for task_id in task_ids)
+    if not all_tasks_handled:
+        missing_tasks = set(task_ids) - set(task["task_id"] for task in schedule)
+        results["all_tasks_handled"] = (
+            False,
+            f"The following tasks are missing from the schedule: {list(missing_tasks)}"
+        )
+    else:
+        results["all_tasks_handled"] = (True, "All tasks are handled in the schedule.")
+
+    # 2. Check that tasks do not start before their release dates
+    early_start_violations = []
     for task in schedule:
         task_id = task["task_id"]
-        release_date = input_data.loc[
-            input_data["TaskID"] == task_id, "ReleaseDate"
-        ].iloc[0]
-        
-        early_starts.extend(
-            f"Task {task_id} on Machine {m_num} starts early: {start} < {release_date}"
-            for m_num, start, _ in task["machine_times"]
-            if start < release_date
-        )
-    
-    results["no_early_start"] = (
-        not early_starts,
-        "\n".join(early_starts) if early_starts else "No early starts."
-    )
-    
-    # Additional validation checks would follow similar pattern...
+        release_date = input_data.loc[input_data["TaskID"] == task_id, "ReleaseDate"].values[0]
+        for machine_num, start_time, _ in task["machine_times"]:
+            if start_time < release_date:
+                early_start_violations.append(
+                    f"Task {task_id} on Machine {machine_num} starts before its release date ({start_time} < {release_date})."
+                )
+
+    if early_start_violations:
+        results["no_early_start"] = (False, "\n".join(early_start_violations))
+    else:
+        results["no_early_start"] = (True, "No tasks start before their release dates.")
+
+    # 3. Check that each task goes through all machines
+    machines_visited_violations = []
+    for task in schedule:
+        machine_times = [machine_num-1 for machine_num, _, _ in task["machine_times"]]
+        if sorted(machine_times) != sorted(range(len(machine_columns))):
+            machines_visited_violations.append(
+                f"Task {task['task_id']} does not go through all machines (expected {len(machine_columns)} machines)."
+            )
+
+    if machines_visited_violations:
+        results["all_machines_visited"] = (False, "\n".join(machines_visited_violations))
+    else:
+        results["all_machines_visited"] = (True, "All tasks visit all required machines.")
+
+    # 4. Check that each task spends the correct amount of time on each machine
+    processing_time_violations = []
+    for task in schedule:
+        task_id = task["task_id"]
+        for machine_num, start_time, end_time in task["machine_times"]:
+            expected_duration = input_data.loc[input_data["TaskID"] == task_id, machine_columns[machine_num-1]].values[0]
+            actual_duration = end_time - start_time
+            if actual_duration != expected_duration:
+                processing_time_violations.append(
+                    f"Task {task_id} on Machine {machine_num} has an incorrect duration ({actual_duration} != {expected_duration})."
+                )
+
+    if processing_time_violations:
+        results["correct_processing_time"] = (False, "\n".join(processing_time_violations))
+    else:
+        results["correct_processing_time"] = (True, "All tasks have the correct processing time on each machine.")
     
     results["Optimal solution"] = (
         status == cp_model.OPTIMAL,
         "Optimal solution found" if status == cp_model.OPTIMAL 
-        else "Feasible but not optimal solution"
+        else "Feasible but not optimal solution found"
     )
     
     return results
