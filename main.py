@@ -245,5 +245,3 @@ def load_and_validate_data(uploaded_file) -> pd.DataFrame:
     except Exception as e:
         st.error(f"Error reading file: {e}")
         return None
-
-# Continue with other helper functions...
